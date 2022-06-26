@@ -15,11 +15,13 @@ pub enum Value {
     Array(Vec<Value>),
 }
 
-impl TryFrom<&str> for Value {
-    type Error = &'static str;
+const UNEXPECTED_INPUT: &str = "Unexpected input";
 
-    fn try_from(_source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
-        Err("Unexpected input")
+impl TryFrom<&str> for Value {
+    type Error = String;
+
+    fn try_from(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
+        Err(UNEXPECTED_INPUT.into())
     }
 }
 
@@ -29,6 +31,6 @@ mod tests {
 
     #[test]
     fn value_implement_try_from() {
-        let _value: Result<Value, &str> = "".try_into();
+        let _value: Result<Value, String> = "".try_into();
     }
 }
