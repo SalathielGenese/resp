@@ -1,6 +1,7 @@
 use std::convert::TryFrom;
 
 /// A wrapper type for a RESP value.
+#[derive(Debug,PartialEq)]
 pub enum Value {
     /// Denote the absence of value.
     Nil,
