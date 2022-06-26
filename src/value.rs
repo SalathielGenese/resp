@@ -17,11 +17,33 @@ pub enum Value {
 
 const UNEXPECTED_INPUT: &str = "Unexpected input";
 
+impl Value {
+    fn extract_integer(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
+        let mut chars = source.chars();
+        let mut length = 0usize;
+
+        chars.next();
+        while let Some('0'..='9') = chars.next() { length += 1; }
+        if "\r" == &source[1+length..2+length] && (Some('\n') == chars.next()) {
+            let raw = source[1..1+length].to_string();
+            return match raw.parse::<i64>() {
+                Ok(value) => Ok(Value::Integer(value)),
+                _ => Err(format!("Cannot parse '{}' into i64", raw)),
+            };
+        }
+
+        Err(UNEXPECTED_INPUT.into())
+    }
+}
+
 impl TryFrom<&str> for Value {
     type Error = String;
 
     fn try_from(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
-        Err(UNEXPECTED_INPUT.into())
+        match source.chars().next() {
+            Some(':') => Value::extract_integer(source),
+            _ => Err(UNEXPECTED_INPUT.into())
+        }
     }
 }
 
@@ -32,5 +54,11 @@ mod tests {
     #[test]
     fn value_implement_try_from() {
         let _value: Result<Value, String> = "".try_into();
+    }
+
+    #[test]
+    fn value_implement_try_from_resp_integer_str() {
+        let value: Result<Value, String> = ":10\r\n".try_into();
+        assert_eq!(value, Ok(Value::Integer(10i64)));
     }
 }
