@@ -19,6 +19,7 @@ const UNEXPECTED_INPUT: &str = "Unexpected input";
 
 impl Value {
     fn extract_integer(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
+        // TODO: Support negative numbers
         let mut chars = source.chars();
         let mut length = 0usize;
 
