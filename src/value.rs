@@ -44,6 +44,8 @@ impl Value {
     }
 
     fn extract_bulk_string(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
+        if source.starts_with("$-1\r\n") { return Ok(Value::Nil); }
+
         match Self::extract_integer(source) {
             Ok(Value::Integer(len)) => {
                 let len = len as usize;
@@ -94,6 +96,11 @@ impl TryFrom<&str> for Value {
 #[cfg(test)]
 mod tests {
     use super::{Value};
+
+    #[test]
+    fn value_implement_try_from_resp_nil() {
+        assert_eq!("$-1\r\n".try_into(), Ok(Value::Nil));
+    }
 
     #[test]
     fn value_implement_try_from() {
