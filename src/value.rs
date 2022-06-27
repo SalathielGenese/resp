@@ -35,6 +35,21 @@ impl Value {
 
         Err(UNEXPECTED_INPUT.into())
     }
+
+    fn extract_simple_string(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> { // 1990-08-07
+        let mut chars = source.chars();
+        let mut length = 0usize;
+
+        chars.next();
+        while let Some(char) = chars.next() {
+            if char != '\r' && char != '\n' {length += 1} else {break}
+        }
+        if "\r" == &source[1+length..2+length] && (Some('\n') == chars.next()) {
+            return Ok(Value::String(source[1..1+length].to_string()));
+        }
+
+        Err(UNEXPECTED_INPUT.into())
+    }
 }
 
 impl TryFrom<&str> for Value {
@@ -43,6 +58,7 @@ impl TryFrom<&str> for Value {
     fn try_from(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
         match source.chars().next() {
             Some(':') => Value::extract_integer(source),
+            Some('+') => Value::extract_simple_string(source),
             _ => Err(UNEXPECTED_INPUT.into())
         }
     }
@@ -61,5 +77,11 @@ mod tests {
     fn value_implement_try_from_resp_integer_str() {
         let value: Result<Value, String> = ":10\r\n".try_into();
         assert_eq!(value, Ok(Value::Integer(10i64)));
+    }
+
+    #[test]
+    fn value_implement_try_from_resp_simple_string() {
+        let value: Result<Value, String> = "+Anatomy\r\n".try_into();
+        assert_eq!(value, Ok(Value::String("Anatomy".into())));
     }
 }
