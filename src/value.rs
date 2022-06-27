@@ -18,6 +18,21 @@ pub enum Value {
 const UNEXPECTED_INPUT: &str = "Unexpected input";
 const UNSUPPORTED_FEATURE_NESTED_ARRAY: &str = "Unsupported feature: nested array";
 
+impl TryFrom<&str> for Value {
+    type Error = String;
+
+    fn try_from(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
+        match source.chars().next() {
+            Some('*') => Value::extract_array(source),
+            Some('-') => Value::extract_error(source),
+            Some(':') => Value::extract_integer(source),
+            Some('$') => Value::extract_bulk_string(source),
+            Some('+') => Value::extract_simple_string(source),
+            _ => Err(UNEXPECTED_INPUT.into())
+        }
+    }
+}
+
 impl Value {
     fn extract_array(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
         match Value::extract_integer(source) {
@@ -118,21 +133,6 @@ impl Value {
         }
 
         Err(UNEXPECTED_INPUT.into())
-    }
-}
-
-impl TryFrom<&str> for Value {
-    type Error = String;
-
-    fn try_from(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
-        match source.chars().next() {
-            Some('*') => Value::extract_array(source),
-            Some('-') => Value::extract_error(source),
-            Some(':') => Value::extract_integer(source),
-            Some('$') => Value::extract_bulk_string(source),
-            Some('+') => Value::extract_simple_string(source),
-            _ => Err(UNEXPECTED_INPUT.into())
-        }
     }
 }
 
