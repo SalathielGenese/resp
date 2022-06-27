@@ -2,6 +2,9 @@
 name = "squall_dot_io_resp"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+authors = ["Salathiel Genese <salathiel@genese.name>"]
+description = "A RESP parser implementation, written with edge performance in mind."
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
