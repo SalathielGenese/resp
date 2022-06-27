@@ -53,8 +53,10 @@ impl Value {
                 let post_value_index = post_size_index + 2 + len;
                 let value = source[post_size_index+2..post_value_index].to_string();
 
-                if len == value.as_bytes().len() && "\r\n" == &source[post_value_index..post_value_index+2] {
-                    return Ok(Value::String(value));
+                if "\r\n" == &source[post_value_index..post_value_index+2] {
+                    if len == value.as_bytes().len() {
+                        return Ok(Value::String(value));
+                    }
                 }
 
                 Err(UNEXPECTED_INPUT.into())
@@ -95,7 +97,7 @@ impl TryFrom<&str> for Value {
 
 #[cfg(test)]
 mod tests {
-    use super::{Value};
+    use super::{UNEXPECTED_INPUT, Value};
 
     #[test]
     fn value_implement_try_from_resp_nil() {
@@ -118,13 +120,28 @@ mod tests {
     }
 
     #[test]
+    fn value_implement_try_from_resp_integer_with_invalid_integer() {
+        assert_eq!(":Yikes\r\n".try_into() as Result<Value, String>, Err(UNEXPECTED_INPUT.into()));
+    }
+
+    #[test]
     fn value_implement_try_from_resp_bulk_string() {
         assert_eq!("$4\r\nOops\r\n".try_into(), Ok(Value::String("Oops".into())));
         assert_eq!("$7\r\nOh\r\nOh!\r\n".try_into(), Ok(Value::String("Oh\r\nOh!".into())));
     }
 
     #[test]
+    fn value_implement_try_from_resp_bulk_string_with_invalid_len() {
+        assert_eq!("$3\r\nOops\r\n".try_into() as Result<Value, String>, Err(UNEXPECTED_INPUT.into()));
+    }
+
+    #[test]
     fn value_implement_try_from_resp_simple_string() {
         assert_eq!("+Anatomy\r\n".try_into(), Ok(Value::String("Anatomy".into())));
+    }
+
+    #[test]
+    fn value_implement_try_from_resp_simple_string_with_line_feed_in_value() {
+        assert_eq!("+Top\nBottom\r\n".try_into() as Result<Value, String>, Err(UNEXPECTED_INPUT.into()));
     }
 }
