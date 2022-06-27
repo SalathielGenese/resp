@@ -16,8 +16,48 @@ pub enum Value {
 }
 
 const UNEXPECTED_INPUT: &str = "Unexpected input";
+const UNSUPPORTED_FEATURE_NESTED_ARRAY: &str = "Unsupported feature: nested array";
 
 impl Value {
+    fn extract_array(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
+        match Value::extract_integer(source) {
+            Ok(Value::Integer(len)) => {
+                let len = len as usize;
+                let mut values = vec![];
+                let mut offset = 1 + len.to_string().len() + 2;
+
+                while values.len() < len {
+                    match Value::try_from(&source[offset..source.len()]) {
+                        // TODO: Support nested arrays
+                        Ok(Value::Array(_)) => return Err(UNSUPPORTED_FEATURE_NESTED_ARRAY.into()),
+                        Ok(Value::Integer(value)) => {
+                            offset += 1 + value.to_string().len() + 2;
+                            values.push(Value::Integer(value));
+                        },
+                        Ok(Value::Error(message)) => {
+                            offset += 1 + message.len() + 2;
+                            values.push(Value::Error(message));
+                        },
+                        Ok(Value::String(content)) => {
+                            offset += 1 + content.len() + 2;
+                            values.push(Value::String(content));
+                        },
+                        Ok(Value::Nil) => {
+                            offset += 5;
+                            values.push(Value::Nil);
+                        },
+                        Err(reason) => {
+                            return Err(reason);
+                        },
+                    }
+                }
+
+                Ok(Value::Array(values))
+            },
+            r#else => return r#else,
+        }
+    }
+
     fn extract_error(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
         match Value::extract_simple_string(source) {
             Ok(Value::String(message)) => Ok(Value::Error(message)),
@@ -54,7 +94,7 @@ impl Value {
                 let value = source[post_size_index+2..post_value_index].to_string();
 
                 if "\r\n" == &source[post_value_index..post_value_index+2] {
-                    if len == value.as_bytes().len() {
+                    if len == value.len() {
                         return Ok(Value::String(value));
                     }
                 }
@@ -86,6 +126,7 @@ impl TryFrom<&str> for Value {
 
     fn try_from(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
         match source.chars().next() {
+            Some('*') => Value::extract_array(source),
             Some('-') => Value::extract_error(source),
             Some(':') => Value::extract_integer(source),
             Some('$') => Value::extract_bulk_string(source),
@@ -107,6 +148,24 @@ mod tests {
     #[test]
     fn value_implement_try_from() {
         let _value: Result<Value, String> = "".try_into();
+    }
+
+    #[test]
+    fn value_implement_try_from_resp_array() {
+        assert_eq!("*0\r\n".try_into(), Ok(Value::Array(vec![])));
+        assert_eq!("*5\r\n$-1\r\n:447\r\n-Oh oh!\r\n+Hourly\r\n$26\r\nSi vis pacem,\r\npara bellum\r\n".try_into(),
+        Ok(Value::Array(vec![
+            Value::Nil,
+            Value::Integer(447),
+            Value::Error("Oh oh!".into()),
+            Value::String("Hourly".into()),
+            Value::String("Si vis pacem,\r\npara bellum".into()),
+        ])));
+    }
+
+    #[test]
+    fn value_implement_try_from_resp_array_with_invalid_size() {
+        assert_eq!("*!\r\n$-1\r\n".try_into() as Result<Value, String>, Err(UNEXPECTED_INPUT.into()));
     }
 
     #[test]
