@@ -74,7 +74,7 @@ mod tests {
     }
 
     #[test]
-    fn value_implement_try_from_resp_integer_str() {
+    fn value_implement_try_from_resp_integer() {
         let value: Result<Value, String> = ":10\r\n".try_into();
         assert_eq!(value, Ok(Value::Integer(10i64)));
     }
