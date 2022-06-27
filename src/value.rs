@@ -59,6 +59,11 @@ impl TryFrom<&str> for Value {
         match source.chars().next() {
             Some(':') => Value::extract_integer(source),
             Some('+') => Value::extract_simple_string(source),
+            Some('-') => match Value::extract_simple_string(source) {
+                Ok(Value::String(message)) => Ok(Value::Error(message)),
+                Err(reason) => Err(reason),
+                _ => Err(UNEXPECTED_INPUT.into()),
+            },
             _ => Err(UNEXPECTED_INPUT.into())
         }
     }
@@ -71,6 +76,12 @@ mod tests {
     #[test]
     fn value_implement_try_from() {
         let _value: Result<Value, String> = "".try_into();
+    }
+
+    #[test]
+    fn value_implement_try_from_resp_error() {
+        let value: Result<Value, String> = "-My bad\r\n".try_into();
+        assert_eq!(value, Ok(Value::Error("My bad".into())));
     }
 
     #[test]
