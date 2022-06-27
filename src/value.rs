@@ -18,6 +18,13 @@ pub enum Value {
 const UNEXPECTED_INPUT: &str = "Unexpected input";
 
 impl Value {
+    fn extract_error(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
+        match Value::extract_simple_string(source) {
+            Ok(Value::String(message)) => Ok(Value::Error(message)),
+            r#else => r#else,
+        }
+    }
+
     fn extract_integer(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
         // TODO: Support negative numbers
         let mut chars = source.chars();
@@ -25,7 +32,7 @@ impl Value {
 
         chars.next();
         while let Some('0'..='9') = chars.next() { length += 1; }
-        if "\r" == &source[1+length..2+length] && (Some('\n') == chars.next()) {
+        if "\r\n" == &source[1+length..3+length] {
             let raw = source[1..1+length].to_string();
             return match raw.parse::<i64>() {
                 Ok(value) => Ok(Value::Integer(value)),
@@ -50,8 +57,7 @@ impl Value {
 
                 Err(UNEXPECTED_INPUT.into())
             },
-            Err(reason) => Err(reason),
-            _ => Err(UNEXPECTED_INPUT.into()),
+            r#else => r#else,
         }
     }
 
@@ -63,7 +69,7 @@ impl Value {
         while let Some(char) = chars.next() {
             if char != '\r' && char != '\n' {length += 1} else {break}
         }
-        if "\r" == &source[1+length..2+length] && (Some('\n') == chars.next()) {
+        if "\r\n" == &source[1+length..3+length] {
             return Ok(Value::String(source[1..1+length].to_string()));
         }
 
@@ -76,14 +82,10 @@ impl TryFrom<&str> for Value {
 
     fn try_from(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
         match source.chars().next() {
+            Some('-') => Value::extract_error(source),
             Some(':') => Value::extract_integer(source),
             Some('$') => Value::extract_bulk_string(source),
             Some('+') => Value::extract_simple_string(source),
-            Some('-') => match Value::extract_simple_string(source) {
-                Ok(Value::String(message)) => Ok(Value::Error(message)),
-                Err(reason) => Err(reason),
-                _ => Err(UNEXPECTED_INPUT.into()),
-            },
             _ => Err(UNEXPECTED_INPUT.into())
         }
     }
@@ -100,14 +102,12 @@ mod tests {
 
     #[test]
     fn value_implement_try_from_resp_error() {
-        let value: Result<Value, String> = "-My bad\r\n".try_into();
-        assert_eq!(value, Ok(Value::Error("My bad".into())));
+        assert_eq!("-My bad\r\n".try_into(), Ok(Value::Error("My bad".into())));
     }
 
     #[test]
     fn value_implement_try_from_resp_integer() {
-        let value: Result<Value, String> = ":10\r\n".try_into();
-        assert_eq!(value, Ok(Value::Integer(10i64)));
+        assert_eq!(":10\r\n".try_into(), Ok(Value::Integer(10i64)));
     }
 
     #[test]
@@ -118,7 +118,6 @@ mod tests {
 
     #[test]
     fn value_implement_try_from_resp_simple_string() {
-        let value: Result<Value, String> = "+Anatomy\r\n".try_into();
-        assert_eq!(value, Ok(Value::String("Anatomy".into())));
+        assert_eq!("+Anatomy\r\n".try_into(), Ok(Value::String("Anatomy".into())));
     }
 }
