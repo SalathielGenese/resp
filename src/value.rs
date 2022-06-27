@@ -2,6 +2,33 @@ use std::convert::TryFrom;
 use std::cmp::PartialEq;
 
 /// A wrapper type for a RESP value.
+///
+/// This enum implements the `TryFrom` trait (`TryFrom<&str>`), to provide on-the-fly parsing of RESP strings.
+///
+/// # Examples
+///
+/// ```
+/// let nil_result: Result<Value, String> = "$-1\r\n".try_into(); // JSON: null
+/// println!("{:?}", nil_result);
+///
+/// let integer_result: Result<Value, String> = ":10\r\n".try_into(); // JSON: 10
+/// println!("{:?}", integer_result);
+///
+/// let string_result: Result<Value, String> = "+Nina Simone\r\n".try_into(); // JSON: "Nina Simone"
+/// println!("{:?}", string_result);
+///
+/// let bulk_string_result: Result<Value, String> = // JSON: "Lorem ipsum...\r\nDolor sit amet..."
+///     "$33\r\nLorem ipsum...\r\nDolor sit amet...\r\n".try_into();
+/// println!("{:?}", bulk_string_result);
+///
+/// let array_result: Result<Value, String> = // JavaScript: [null, 447, new Error("Oh oh!"), "Hourly", "Si vis pacem,\r\npara bellum"]
+///     "*5\r\n$-1\r\n:447\r\n-Oh oh!\r\n+Hourly\r\n$26\r\nSi vis pacem,\r\npara bellum\r\n".try_into();
+/// println!("{:?}", array_result);
+///
+///
+/// NOTE: Even recursive arrays - we leave that for you to try out.
+/// ```
+///
 #[derive(Debug,PartialEq)]
 pub enum Value {
     /// Denote the absence of value.
