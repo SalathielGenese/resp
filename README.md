@@ -6,6 +6,10 @@ A RESP parser implementation, written with edge performance in mind.
 >
 > https://redis.io/docs/reference/protocol-spec/
 
+## Dependency-ready
+
++ https://crates.io/crates/squall_dot_io_resp
+
 ## License
 
 MIT
