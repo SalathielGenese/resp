@@ -22,100 +22,89 @@ impl TryFrom<&str> for Value {
     type Error = String;
 
     fn try_from(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
+        Self::internal_try_from(source).0
+    }
+}
+
+impl Value {
+    fn internal_try_from(source: &str) -> (Result<Self, <Value as TryFrom<&str>>::Error>, usize) {
         match source.chars().next() {
             Some('*') => Value::extract_array(source),
             Some('-') => Value::extract_error(source),
             Some(':') => Value::extract_integer(source),
             Some('$') => Value::extract_bulk_string(source),
             Some('+') => Value::extract_simple_string(source),
-            _ => Err(UNEXPECTED_INPUT.into())
+            _ => (Err(UNEXPECTED_INPUT.into()), 0)
         }
     }
-}
 
-impl Value {
-    fn extract_array(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
+    fn extract_array(source: &str) -> (Result<Self, <Value as TryFrom<&str>>::Error>, usize) {
         match Value::extract_integer(source) {
-            Ok(Value::Integer(len)) => {
-                let len = len as usize;
+            (Ok(Value::Integer(len)), size) => {
+                let mut offset = size;
                 let mut values = vec![];
-                let mut offset = 1 + len.to_string().len() + 2;
 
-                while values.len() < len {
-                    match Value::try_from(&source[offset..source.len()]) {
+                while values.len() < len as usize {
+                    match Value::internal_try_from(&source[offset..source.len()]) {
                         // TODO: Support nested arrays
-                        Ok(Value::Array(_)) => return Err(UNSUPPORTED_FEATURE_NESTED_ARRAY.into()),
-                        Ok(Value::Integer(value)) => {
-                            offset += 1 + value.to_string().len() + 2;
-                            values.push(Value::Integer(value));
+                        (Ok(Value::Array(_)), _) => return (Err(UNSUPPORTED_FEATURE_NESTED_ARRAY.into()), 0),
+                        (Ok(value), size) => {
+                            values.push(value);
+                            offset += size;
                         },
-                        Ok(Value::Error(message)) => {
-                            offset += 1 + message.len() + 2;
-                            values.push(Value::Error(message));
-                        },
-                        Ok(Value::String(content)) => {
-                            offset += 1 + content.len() + 2;
-                            values.push(Value::String(content));
-                        },
-                        Ok(Value::Nil) => {
-                            offset += 5;
-                            values.push(Value::Nil);
-                        },
-                        Err(reason) => {
-                            return Err(reason);
-                        },
+                        r#else => return r#else,
                     }
                 }
 
-                Ok(Value::Array(values))
+                (Ok(Value::Array(values)), offset)
             },
             r#else => return r#else,
         }
     }
 
-    fn extract_error(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
+    fn extract_error(source: &str) -> (Result<Self, <Value as TryFrom<&str>>::Error>, usize) {
         match Value::extract_simple_string(source) {
-            Ok(Value::String(message)) => Ok(Value::Error(message)),
+            (Ok(Value::String(message)), size) => (Ok(Value::Error(message)), size),
             r#else => r#else,
         }
     }
 
-    fn extract_integer(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
+    fn extract_integer(source: &str) -> (Result<Self, <Value as TryFrom<&str>>::Error>, usize) {
         // TODO: Support negative numbers
         if let Some(i) = source.find("\r\n") {
             if let &Ok(value) = &source[1..i].parse::<i64>() {
-                return Ok(Value::Integer(value));
+                return (Ok(Value::Integer(value)), i+2);
             }
         }
 
-        Err(UNEXPECTED_INPUT.into())
+        (Err(UNEXPECTED_INPUT.into()), 0)
     }
 
-    fn extract_bulk_string(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
+    fn extract_bulk_string(source: &str) -> (Result<Self, <Value as TryFrom<&str>>::Error>, usize) {
         if source.starts_with("$-1\r\n") {
-            return Ok(Value::Nil);
+            return (Ok(Value::Nil), 5);
         }
 
-        if let Ok(Value::Integer(size)) = Self::extract_integer(source) {
+        if let (Ok(Value::Integer(size)), _) = Self::extract_integer(source) {
             let start = 1 + size.to_string().len() + 2;
             let end = start + size as usize;
 
             if "\r\n" == &source[end..end+2] {
-                return Ok(Value::String(source[start..end].to_string()));
+                return (Ok(Value::String(source[start..end].to_string())), end+2);
             }
         }
 
-        Err(UNEXPECTED_INPUT.into())
+        (Err(UNEXPECTED_INPUT.into()), 0)
     }
 
-    fn extract_simple_string(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
+    fn extract_simple_string(source: &str) -> (Result<Self, <Value as TryFrom<&str>>::Error>, usize) {
         if let Some(i) = source.find("\r\n") {
             if !source[1..i].contains('\r') && !source[1..i].contains('\n') {
-                return Ok(Value::String(source[1..i].into()));
+                return (Ok(Value::String(source[1..i].into())), i+2);
             }
         }
 
-        Err(UNEXPECTED_INPUT.into())
+        (Err(UNEXPECTED_INPUT.into()), 0)
     }
 }
 
