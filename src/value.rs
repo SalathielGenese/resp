@@ -82,54 +82,37 @@ impl Value {
 
     fn extract_integer(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
         // TODO: Support negative numbers
-        let mut chars = source.chars();
-        let mut length = 0usize;
-
-        chars.next();
-        while let Some('0'..='9') = chars.next() { length += 1; }
-        if "\r\n" == &source[1+length..3+length] {
-            let raw = source[1..1+length].to_string();
-            return match raw.parse::<i64>() {
-                Ok(value) => Ok(Value::Integer(value)),
-                _ => Err(format!("Cannot parse '{}' into i64", raw)),
-            };
+        if let Some(i) = source.find("\r\n") {
+            if let &Ok(value) = &source[1..i].parse::<i64>() {
+                return Ok(Value::Integer(value));
+            }
         }
 
         Err(UNEXPECTED_INPUT.into())
     }
 
     fn extract_bulk_string(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
-        if source.starts_with("$-1\r\n") { return Ok(Value::Nil); }
-
-        match Self::extract_integer(source) {
-            Ok(Value::Integer(len)) => {
-                let len = len as usize;
-                let post_size_index = 1 + len.to_string().len();
-                let post_value_index = post_size_index + 2 + len;
-                let value = source[post_size_index+2..post_value_index].to_string();
-
-                if "\r\n" == &source[post_value_index..post_value_index+2] {
-                    if len == value.len() {
-                        return Ok(Value::String(value));
-                    }
-                }
-
-                Err(UNEXPECTED_INPUT.into())
-            },
-            r#else => r#else,
+        if source.starts_with("$-1\r\n") {
+            return Ok(Value::Nil);
         }
+
+        if let Ok(Value::Integer(size)) = Self::extract_integer(source) {
+            let start = 1 + size.to_string().len() + 2;
+            let end = start + size as usize;
+
+            if "\r\n" == &source[end..end+2] {
+                return Ok(Value::String(source[start..end].to_string()));
+            }
+        }
+
+        Err(UNEXPECTED_INPUT.into())
     }
 
     fn extract_simple_string(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
-        let mut chars = source.chars();
-        let mut length = 0usize;
-
-        chars.next();
-        while let Some(char) = chars.next() {
-            if char != '\r' && char != '\n' {length += 1} else {break}
-        }
-        if "\r\n" == &source[1+length..3+length] {
-            return Ok(Value::String(source[1..1+length].to_string()));
+        if let Some(i) = source.find("\r\n") {
+            if !source[1..i].contains('\r') && !source[1..i].contains('\n') {
+                return Ok(Value::String(source[1..i].into()));
+            }
         }
 
         Err(UNEXPECTED_INPUT.into())
