@@ -36,6 +36,25 @@ impl Value {
         Err(UNEXPECTED_INPUT.into())
     }
 
+    fn extract_bulk_string(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
+        match Self::extract_integer(source) {
+            Ok(Value::Integer(len)) => {
+                let len = len as usize;
+                let post_size_index = 1 + len.to_string().len();
+                let post_value_index = post_size_index + 2 + len;
+                let value = source[post_size_index+2..post_value_index].to_string();
+
+                if len == value.as_bytes().len() && "\r\n" == &source[post_value_index..post_value_index+2] {
+                    return Ok(Value::String(value));
+                }
+
+                Err(UNEXPECTED_INPUT.into())
+            },
+            Err(reason) => Err(reason),
+            _ => Err(UNEXPECTED_INPUT.into()),
+        }
+    }
+
     fn extract_simple_string(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
         let mut chars = source.chars();
         let mut length = 0usize;
@@ -58,6 +77,7 @@ impl TryFrom<&str> for Value {
     fn try_from(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
         match source.chars().next() {
             Some(':') => Value::extract_integer(source),
+            Some('$') => Value::extract_bulk_string(source),
             Some('+') => Value::extract_simple_string(source),
             Some('-') => match Value::extract_simple_string(source) {
                 Ok(Value::String(message)) => Ok(Value::Error(message)),
@@ -88,6 +108,12 @@ mod tests {
     fn value_implement_try_from_resp_integer() {
         let value: Result<Value, String> = ":10\r\n".try_into();
         assert_eq!(value, Ok(Value::Integer(10i64)));
+    }
+
+    #[test]
+    fn value_implement_try_from_resp_bulk_string() {
+        assert_eq!("$4\r\nOops\r\n".try_into(), Ok(Value::String("Oops".into())));
+        assert_eq!("$7\r\nOh\r\nOh!\r\n".try_into(), Ok(Value::String("Oh\r\nOh!".into())));
     }
 
     #[test]
