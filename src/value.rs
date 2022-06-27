@@ -36,7 +36,7 @@ impl Value {
         Err(UNEXPECTED_INPUT.into())
     }
 
-    fn extract_simple_string(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> { // 1990-08-07
+    fn extract_simple_string(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
         let mut chars = source.chars();
         let mut length = 0usize;
 
