@@ -1,4 +1,5 @@
 use std::convert::TryFrom;
+use std::cmp::PartialEq;
 
 /// A wrapper type for a RESP value.
 #[derive(Debug,PartialEq)]
@@ -16,13 +17,12 @@ pub enum Value {
 }
 
 const UNEXPECTED_INPUT: &str = "Unexpected input";
-const UNSUPPORTED_FEATURE_NESTED_ARRAY: &str = "Unsupported feature: nested array";
 
 impl TryFrom<&str> for Value {
     type Error = String;
 
     fn try_from(source: &str) -> Result<Self, <Value as TryFrom<&str>>::Error> {
-        Self::internal_try_from(source).0
+        Value::internal_try_from(source).0
     }
 }
 
@@ -46,8 +46,6 @@ impl Value {
 
                 while values.len() < len as usize {
                     match Value::internal_try_from(&source[offset..source.len()]) {
-                        // TODO: Support nested arrays
-                        (Ok(Value::Array(_)), _) => return (Err(UNSUPPORTED_FEATURE_NESTED_ARRAY.into()), 0),
                         (Ok(value), size) => {
                             values.push(value);
                             offset += size;
@@ -133,6 +131,17 @@ mod tests {
             Value::String("Hourly".into()),
             Value::String("Si vis pacem,\r\npara bellum".into()),
         ])));
+    }
+
+    #[test]
+    fn value_implement_try_from_resp_nested_array() {
+        let got = "*2\r\n*3\r\n+A\r\n+B\r\n+C\r\n*3\r\n:1\r\n:2\r\n:3\r\n".try_into() as Result<Value, String>;
+        let expected = Ok(Value::Array(vec![
+            Value::Array(vec![Value::String("A".into()), Value::String("B".into()), Value::String("C".into())]),
+            Value::Array(vec![Value::Integer(1), Value::Integer(2), Value::Integer(3)]),
+        ])) as Result<Value, String>;
+
+        assert_eq!(got, expected);
     }
 
     #[test]
