@@ -1,6 +1,3 @@
-use std::cmp::PartialEq;
-use std::convert::TryFrom;
-
 /// A wrapper type for a RESP value.
 ///
 /// This enum implements the `TryFrom` trait (`TryFrom<&str>`), to provide
@@ -34,7 +31,7 @@ use std::convert::TryFrom;
 /// }
 /// ```
 ///
-#[derive(Debug,PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum Value {
     /// Denote the absence of value.
     Nil,
@@ -66,7 +63,7 @@ impl Value {
             Some(':') => Value::extract_integer(source),
             Some('$') => Value::extract_bulk_string(source),
             Some('+') => Value::extract_simple_string(source),
-            _ => (Err(UNEXPECTED_INPUT.into()), 0)
+            _ => (Err(UNEXPECTED_INPUT.into()), 0),
         }
     }
 
@@ -81,13 +78,13 @@ impl Value {
                         (Ok(value), size) => {
                             values.push(value);
                             offset += size;
-                        },
+                        }
                         r#else => return r#else,
                     }
                 }
 
                 (Ok(Value::Array(values)), offset)
-            },
+            }
             r#else => return r#else,
         }
     }
@@ -103,7 +100,7 @@ impl Value {
         // TODO: Support negative numbers
         if let Some(i) = source.find("\r\n") {
             if let &Ok(value) = &source[1..i].parse::<i64>() {
-                return (Ok(Value::Integer(value)), i+2);
+                return (Ok(Value::Integer(value)), i + 2);
             }
         }
 
@@ -119,18 +116,20 @@ impl Value {
             let start = 1 + size.to_string().len() + 2;
             let end = start + size as usize;
 
-            if "\r\n" == &source[end..end+2] {
-                return (Ok(Value::String(source[start..end].to_string())), end+2);
+            if "\r\n" == &source[end..end + 2] {
+                return (Ok(Value::String(source[start..end].to_string())), end + 2);
             }
         }
 
         (Err(UNEXPECTED_INPUT.into()), 0)
     }
 
-    fn extract_simple_string(source: &str) -> (Result<Self, <Value as TryFrom<&str>>::Error>, usize) {
+    fn extract_simple_string(
+        source: &str,
+    ) -> (Result<Self, <Value as TryFrom<&str>>::Error>, usize) {
         if let Some(i) = source.find("\r\n") {
             if !source[1..i].contains('\r') && !source[1..i].contains('\n') {
-                return (Ok(Value::String(source[1..i].into())), i+2);
+                return (Ok(Value::String(source[1..i].into())), i + 2);
             }
         }
 
@@ -140,7 +139,7 @@ impl Value {
 
 #[cfg(test)]
 mod tests {
-    use super::{UNEXPECTED_INPUT, Value};
+    use super::{Value, UNEXPECTED_INPUT};
 
     #[test]
     fn value_implement_try_from_resp_nil() {
@@ -155,22 +154,34 @@ mod tests {
     #[test]
     fn value_implement_try_from_resp_array() {
         assert_eq!("*0\r\n".try_into(), Ok(Value::Array(vec![])));
-        assert_eq!("*5\r\n$-1\r\n:447\r\n-Oh oh!\r\n+Hourly\r\n$26\r\nSi vis pacem,\r\npara bellum\r\n".try_into(),
-        Ok(Value::Array(vec![
-            Value::Nil,
-            Value::Integer(447),
-            Value::Error("Oh oh!".into()),
-            Value::String("Hourly".into()),
-            Value::String("Si vis pacem,\r\npara bellum".into()),
-        ])));
+        assert_eq!(
+            "*5\r\n$-1\r\n:447\r\n-Oh oh!\r\n+Hourly\r\n$26\r\nSi vis pacem,\r\npara bellum\r\n"
+                .try_into(),
+            Ok(Value::Array(vec![
+                Value::Nil,
+                Value::Integer(447),
+                Value::Error("Oh oh!".into()),
+                Value::String("Hourly".into()),
+                Value::String("Si vis pacem,\r\npara bellum".into()),
+            ]))
+        );
     }
 
     #[test]
     fn value_implement_try_from_resp_nested_array() {
-        let got = "*2\r\n*3\r\n+A\r\n+B\r\n+C\r\n*3\r\n:1\r\n:2\r\n:3\r\n".try_into() as Result<Value, String>;
+        let got = "*2\r\n*3\r\n+A\r\n+B\r\n+C\r\n*3\r\n:1\r\n:2\r\n:3\r\n".try_into()
+            as Result<Value, String>;
         let expected = Ok(Value::Array(vec![
-            Value::Array(vec![Value::String("A".into()), Value::String("B".into()), Value::String("C".into())]),
-            Value::Array(vec![Value::Integer(1), Value::Integer(2), Value::Integer(3)]),
+            Value::Array(vec![
+                Value::String("A".into()),
+                Value::String("B".into()),
+                Value::String("C".into()),
+            ]),
+            Value::Array(vec![
+                Value::Integer(1),
+                Value::Integer(2),
+                Value::Integer(3),
+            ]),
         ])) as Result<Value, String>;
 
         assert_eq!(got, expected);
@@ -178,7 +189,10 @@ mod tests {
 
     #[test]
     fn value_implement_try_from_resp_array_with_invalid_size() {
-        assert_eq!("*!\r\n$-1\r\n".try_into() as Result<Value, String>, Err(UNEXPECTED_INPUT.into()));
+        assert_eq!(
+            "*!\r\n$-1\r\n".try_into() as Result<Value, String>,
+            Err(UNEXPECTED_INPUT.into())
+        );
     }
 
     #[test]
@@ -193,27 +207,45 @@ mod tests {
 
     #[test]
     fn value_implement_try_from_resp_integer_with_invalid_integer() {
-        assert_eq!(":Yikes\r\n".try_into() as Result<Value, String>, Err(UNEXPECTED_INPUT.into()));
+        assert_eq!(
+            ":Yikes\r\n".try_into() as Result<Value, String>,
+            Err(UNEXPECTED_INPUT.into())
+        );
     }
 
     #[test]
     fn value_implement_try_from_resp_bulk_string() {
-        assert_eq!("$4\r\nOops\r\n".try_into(), Ok(Value::String("Oops".into())));
-        assert_eq!("$7\r\nOh\r\nOh!\r\n".try_into(), Ok(Value::String("Oh\r\nOh!".into())));
+        assert_eq!(
+            "$4\r\nOops\r\n".try_into(),
+            Ok(Value::String("Oops".into()))
+        );
+        assert_eq!(
+            "$7\r\nOh\r\nOh!\r\n".try_into(),
+            Ok(Value::String("Oh\r\nOh!".into()))
+        );
     }
 
     #[test]
     fn value_implement_try_from_resp_bulk_string_with_invalid_len() {
-        assert_eq!("$3\r\nOops\r\n".try_into() as Result<Value, String>, Err(UNEXPECTED_INPUT.into()));
+        assert_eq!(
+            "$3\r\nOops\r\n".try_into() as Result<Value, String>,
+            Err(UNEXPECTED_INPUT.into())
+        );
     }
 
     #[test]
     fn value_implement_try_from_resp_simple_string() {
-        assert_eq!("+Anatomy\r\n".try_into(), Ok(Value::String("Anatomy".into())));
+        assert_eq!(
+            "+Anatomy\r\n".try_into(),
+            Ok(Value::String("Anatomy".into()))
+        );
     }
 
     #[test]
     fn value_implement_try_from_resp_simple_string_with_line_feed_in_value() {
-        assert_eq!("+Top\nBottom\r\n".try_into() as Result<Value, String>, Err(UNEXPECTED_INPUT.into()));
+        assert_eq!(
+            "+Top\nBottom\r\n".try_into() as Result<Value, String>,
+            Err(UNEXPECTED_INPUT.into())
+        );
     }
 }
