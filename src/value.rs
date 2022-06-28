@@ -45,6 +45,14 @@ pub enum Value {
     Array(Vec<Value>),
 }
 
+#[derive(Debug)]
+struct Input<'a> {
+    /// String range to be processed.
+    source: &'a str,
+    /// Bytes count of this range first [`char`], in the original [`&str`].
+    position: usize,
+}
+
 type InnerResult<'a> = (RESULT<'a>, usize);
 
 type RESULT<'a> = Result<Value, <Value as TryFrom<&'a str>>::Error>;
@@ -55,30 +63,44 @@ impl TryFrom<&str> for Value {
     type Error = String;
 
     fn try_from(source: &str) -> RESULT {
-        Value::internal_try_from(source).0
+        Value::internal_try_from(Input {
+            position: 0,
+            source,
+        })
+        .0
     }
 }
 
 impl Value {
-    fn internal_try_from(source: &str) -> InnerResult {
-        match source.chars().next() {
-            Some('*') => Value::extract_array(source),
-            Some('-') => Value::extract_error(source),
-            Some(':') => Value::extract_integer(source),
-            Some('$') => Value::extract_bulk_string(source),
-            Some('+') => Value::extract_simple_string(source),
+    fn internal_try_from(input: Input) -> InnerResult {
+        match input.source.chars().next() {
+            Some('*') => Value::extract_array(input),
+            Some('-') => Value::extract_error(input),
+            Some(':') => Value::extract_integer(input),
+            Some('$') => Value::extract_bulk_string(input),
+            Some('+') => Value::extract_simple_string(input),
             _ => (Err(UNEXPECTED_INPUT.into()), 0),
         }
     }
 
-    fn extract_array(source: &str) -> InnerResult {
-        match Value::extract_integer(source) {
+    fn extract_array(input: Input) -> InnerResult {
+        let integer_input = Input {
+            position: input.position,
+            ..input
+        };
+        match Value::extract_integer(integer_input) {
             (Ok(Value::Integer(len)), size) => {
-                let mut offset = size;
                 let mut values = vec![];
+                let len = len as usize;
+                let mut offset = size;
 
-                while values.len() < len as usize {
-                    match Value::internal_try_from(&source[offset..source.len()]) {
+                while values.len() < len {
+                    let next_input = Input {
+                        position: input.position + offset,
+                        source: &input.source[offset..input.source.len()],
+                    };
+
+                    match Value::internal_try_from(next_input) {
                         (Ok(value), size) => {
                             values.push(value);
                             offset += size;
@@ -93,17 +115,17 @@ impl Value {
         }
     }
 
-    fn extract_error(source: &str) -> InnerResult {
-        match Value::extract_simple_string(source) {
+    fn extract_error(input: Input) -> InnerResult {
+        match Value::extract_simple_string(input) {
             (Ok(Value::String(message)), size) => (Ok(Value::Error(message)), size),
             r#else => r#else,
         }
     }
 
-    fn extract_integer(source: &str) -> InnerResult {
+    fn extract_integer(input: Input) -> InnerResult {
         // TODO: Support negative numbers
-        if let Some(i) = source.find("\r\n") {
-            if let &Ok(value) = &source[1..i].parse::<i64>() {
+        if let Some(i) = input.source.find("\r\n") {
+            if let &Ok(value) = &input.source[1..i].parse::<i64>() {
                 return (Ok(Value::Integer(value)), i + 2);
             }
         }
@@ -111,29 +133,30 @@ impl Value {
         (Err(UNEXPECTED_INPUT.into()), 0)
     }
 
-    fn extract_bulk_string(source: &str) -> InnerResult {
-        if source.starts_with("$-1\r\n") {
+    fn extract_bulk_string(input: Input) -> InnerResult {
+        if input.source.starts_with("$-1\r\n") {
             return (Ok(Value::Nil), 5);
         }
 
-        if let (Ok(Value::Integer(size)), _) = Self::extract_integer(source) {
+        if let (Ok(Value::Integer(size)), _) = Self::extract_integer(Input { ..input }) {
             let start = 1 + size.to_string().len() + 2;
             let end = start + size as usize;
 
-            if "\r\n" == &source[end..end + 2] {
-                return (Ok(Value::String(source[start..end].to_string())), end + 2);
+            if "\r\n" == &input.source[end..end + 2] {
+                return (
+                    Ok(Value::String(input.source[start..end].to_string())),
+                    end + 2,
+                );
             }
         }
 
         (Err(UNEXPECTED_INPUT.into()), 0)
     }
 
-    fn extract_simple_string(
-        source: &str,
-    ) -> InnerResult {
-        if let Some(i) = source.find("\r\n") {
-            if !source[1..i].contains('\r') && !source[1..i].contains('\n') {
-                return (Ok(Value::String(source[1..i].into())), i + 2);
+    fn extract_simple_string(input: Input) -> InnerResult {
+        if let Some(i) = input.source.find("\r\n") {
+            if !input.source[1..i].contains('\r') && !input.source[1..i].contains('\n') {
+                return (Ok(Value::String(input.source[1..i].into())), i + 2);
             }
         }
 
