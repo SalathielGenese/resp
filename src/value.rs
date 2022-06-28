@@ -1,5 +1,5 @@
-use std::convert::TryFrom;
 use std::cmp::PartialEq;
+use std::convert::TryFrom;
 
 /// A wrapper type for a RESP value.
 ///
