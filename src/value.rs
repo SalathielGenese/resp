@@ -7,26 +7,28 @@ use std::cmp::PartialEq;
 ///
 /// # Examples
 ///
-/// ```
-/// let nil_result: Result<Value, String> = "$-1\r\n".try_into(); // JSON: null
-/// println!("{:?}", nil_result);
+/// ```rust
+/// // JSON: null
+/// with_resp("$-1\r\n".try_into());
 ///
-/// let integer_result: Result<Value, String> = ":10\r\n".try_into(); // JSON: 10
-/// println!("{:?}", integer_result);
+/// // JSON: 10
+/// with_resp(":10\r\n".try_into());
 ///
-/// let string_result: Result<Value, String> = "+Nina Simone\r\n".try_into(); // JSON: "Nina Simone"
-/// println!("{:?}", string_result);
+/// // JSON: "Nina Simone"
+/// with_resp("+Nina Simone\r\n".try_into());
 ///
-/// let bulk_string_result: Result<Value, String> = // JSON: "Lorem ipsum...\r\nDolor sit amet..."
-///     "$33\r\nLorem ipsum...\r\nDolor sit amet...\r\n".try_into();
-/// println!("{:?}", bulk_string_result);
+/// // JSON: "Lorem ipsum...\r\nDolor sit amet..."
+/// with_resp("$33\r\nLorem ipsum...\r\nDolor sit amet...\r\n".try_into());
 ///
-/// let array_result: Result<Value, String> = // JavaScript: [null, 447, new Error("Oh oh!"), "Hourly", "Si vis pacem,\r\npara bellum"]
-///     "*5\r\n$-1\r\n:447\r\n-Oh oh!\r\n+Hourly\r\n$26\r\nSi vis pacem,\r\npara bellum\r\n".try_into();
-/// println!("{:?}", array_result);
+/// // JavaScript: [null, 447, new Error("Oh oh!"), "Hourly", "Si vis pacem,\r\npara bellum"]
+/// with_resp("*5\r\n$-1\r\n:447\r\n-Oh oh!\r\n+Hourly\r\n$26\r\nSi vis pacem,\r\npara bellum\r\n"
+///           .try_into());
 ///
+/// // NOTE: Even recursive arrays - we leave that for you to try out.
 ///
-/// NOTE: Even recursive arrays - we leave that for you to try out.
+/// fn with_resp(input: Result<Value, String>) {
+///     println!("{:?}", input);
+/// }
 /// ```
 ///
 #[derive(Debug,PartialEq)]
