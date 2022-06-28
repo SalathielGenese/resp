@@ -1,6 +1,6 @@
 [package]
 name = "squall_dot_io_resp"
-version = "0.1.2"
+version = "1.0.0"
 edition = "2021"
 license = "MIT"
 authors = ["Salathiel Genese <salathiel@genese.name>"]
