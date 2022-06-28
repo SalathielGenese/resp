@@ -30,6 +30,9 @@
 //!
 //! [^pull_request_link]: <https://github.com/SalathielGenese/resp/compare/>
 
-pub mod value;
+pub use error::Node;
+pub use error::Error;
+pub use value::Value;
 
-pub use value::{Value};
+pub mod value;
+pub mod error;
