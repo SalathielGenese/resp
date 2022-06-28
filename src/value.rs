@@ -3,11 +3,14 @@ use std::cmp::PartialEq;
 
 /// A wrapper type for a RESP value.
 ///
-/// This enum implements the `TryFrom` trait (`TryFrom<&str>`), to provide on-the-fly parsing of RESP strings.
+/// This enum implements the `TryFrom` trait (`TryFrom<&str>`), to provide
+/// on-the-fly parsing and validation of RESP strings.
 ///
 /// # Examples
 ///
 /// ```rust
+/// use crate::squall_dot_io_resp::Value;
+///
 /// // JSON: null
 /// with_resp("$-1\r\n".try_into());
 ///
