@@ -5,8 +5,8 @@ written with edge performance in mind.
 
 If you are not familiar with RESP, consider starting here with
 [RESP specs]. RESP is a binary safe serialization
-protocol. Initially developed for the ReDiS project, it injection
-safe (needs no escaping) and is fast forward as it requires no
+protocol. Initially developed for the ReDiS project, it is injection
+safe (needs no escaping) and is fast-forward as it requires no
 look-back in parsing.
 
 This crate aims to parse and validate your RESP strings. Since the
