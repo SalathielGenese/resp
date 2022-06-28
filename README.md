@@ -15,11 +15,7 @@ communication scheme.
 
 To do so, its reuses Rust `TryInto` trait to try and parse your `&str`
 as a valid RESP. Implemented on a `Value` enum of RESP tokens, it
-returns a Rust `Result<Value, String>`.
-
-Whilst the error is a simple string for now, it will evolve into its own
-enum, which will be more descriptive of the reason behind the validation
-error(s) encountered.
+returns a Rust `Result<Value, Error>`.
 
 ## Usage
 
@@ -32,7 +28,7 @@ squall_dot_io_resp = "0.1.2"
 
 Here are example with code:
 ```rust
-use crate::squall_dot_io_resp::Value;
+use crate::squall_dot_io_resp::{Error, Value};
 
 // JSON: null
 with_resp("$-1\r\n".try_into());
@@ -52,7 +48,7 @@ with_resp("*5\r\n$-1\r\n:447\r\n-Oh oh!\r\n+Hourly\r\n$26\r\nSi vis pacem,\r\npa
 
 // NOTE: Even recursive arrays - we leave that for you to try out.
 
-fn with_resp(input: Result<Value, String>) {
+fn with_resp(input: Result<Value, Error>) {
     println!("{:?}", input);
 }
 ```

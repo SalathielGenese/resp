@@ -15,11 +15,7 @@
 //!
 //! To do so, its reuses Rust [`TryInto`] trait to try and parse your [`&str`]
 //! as a valid RESP. Implemented on a [`Value`] enum of RESP tokens, it
-//! returns a Rust [`Result<Value, String>`].
-//!
-//! Whilst the error is a simple string for now, it will evolve into its own
-//! enum, which will be more descriptive of the reason behind the validation
-//! error(s) encountered.
+//! returns a Rust [`Result<Value, Error>`].
 //!
 //! Should you find some issues[^issues_link], please report on GitHub
 //! project, or consider opening a pull-request[^pull_request_link].
