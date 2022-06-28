@@ -9,31 +9,71 @@ use crate::Node::{ARRAY, BULK_STRING, ERROR, INTEGER, SIMPLE_STRING, SIZE, UNKNO
 /// # Examples
 ///
 /// ```rust
-/// use squall_dot_io_resp::{Error, Value};
+/// use squall_dot_io_resp::{
+///     Node::{self, NIL, SIZE, ARRAY, ERROR, INTEGER, UNKNOWN, SIMPLE_STRING, BULK_STRING},
+///     Value::{self, Nil, Error, Array, String, Integer},
+///     Error as VError,
+///     ValueResult,
+/// };
+///
+/// assert_eq!( // Empty RESP
+///     "".try_into() as ValueResult,
+///     Err(VError::Unexpected {node: UNKNOWN, index: 0}));
+///
+/// assert_eq!( // Unterminated number: missing "\r\n"
+///     ":0".try_into() as ValueResult,
+///     Err(VError::Unexpected {node: INTEGER, index: 2}));
+///
+/// assert_eq!( // Not enough elements in the array
+///     "*2\r\n$-1\r\n".try_into() as ValueResult,
+///     Err(VError::Size {node: ARRAY, index: 9}));
+///
+/// assert_eq!( // Longer bulk string: got more that 2-bytes
+///     "$2\r\nHello\r\n".try_into() as ValueResult,
+///     Err(VError::Size {node: BULK_STRING, index: 6}));
+///
+/// assert_eq!( // Sorter bulk string: shorter by 1-byte (capital A acute is 2-bytes)
+///     "$3\r\nÂ\r\n".try_into() as ValueResult,
+///     Err(VError::Size {node: BULK_STRING, index: 7}));
 ///
 /// // JSON: null
-/// with_resp("$-1\r\n".try_into());
+/// assert_eq!(
+///     Value::try_from("$-1\r\n"),
+///     Ok(Nil)
+/// );
 ///
 /// // JSON: 10
-/// with_resp(":10\r\n".try_into());
+/// assert_eq!(
+///     Value::try_from(":10\r\n"),
+///     Ok(Integer(10))
+/// );
 ///
 /// // JSON: "Nina Simone"
-/// with_resp("+Nina Simone\r\n".try_into());
+/// assert_eq!(
+///     Value::try_from("+Nina Simone\r\n"),
+///     Ok(String("Nina Simone".into()))
+/// );
 ///
 /// // JSON: "Lorem ipsum...\r\nDolor sit amet..."
-/// with_resp("$33\r\nLorem ipsum...\r\nDolor sit amet...\r\n".try_into());
+/// assert_eq!(
+///     Value::try_from("$33\r\nLorem ipsum...\r\nDolor sit amet...\r\n"),
+///     Ok(String("Lorem ipsum...\r\nDolor sit amet...".into()))
+/// );
 ///
 /// // JavaScript: [null, 447, new Error("Oh oh!"), "Hourly", "Si vis pacem,\r\npara bellum"]
-/// with_resp("*5\r\n$-1\r\n:447\r\n-Oh oh!\r\n+Hourly\r\n$26\r\nSi vis pacem,\r\npara bellum\r\n"
-///           .try_into());
+/// assert_eq!(
+///     Value::try_from("*5\r\n$-1\r\n:447\r\n-Oh oh!\r\n+Hourly\r\n$26\r\nSi vis pacem,\r\npara bellum\r\n"),
+///     Ok(Array(vec![
+///         Nil,
+///         Integer(447),
+///         Error("Oh oh!".into()),
+///         String("Hourly".into()),
+///         String("Si vis pacem,\r\npara bellum".into())
+///     ]))
+/// );
 ///
 /// // NOTE: Even recursive arrays - we leave that for you to try out.
-///
-/// fn with_resp(input: Result<Value, Error>) {
-///     println!("{:?}", input);
-/// }
 /// ```
-///
 #[derive(Debug, PartialEq)]
 pub enum Value {
     /// Denote the absence of value.
@@ -56,14 +96,15 @@ struct Input<'a> {
     position: usize,
 }
 
-type InnerResult<'a> = (RESULT<'a>, usize);
+type InnerResult<'a> = (ValueResult<'a>, usize);
 
-type RESULT<'a> = Result<Value, <Value as TryFrom<&'a str>>::Error>;
+/// Just a type alias
+pub type ValueResult<'a> = Result<Value, <Value as TryFrom<&'a str>>::Error>;
 
 impl TryFrom<&str> for Value {
     type Error = TError;
 
-    fn try_from(source: &str) -> RESULT {
+    fn try_from(source: &str) -> ValueResult {
         Value::internal_try_from(Input {
             position: 0,
             source,
@@ -146,7 +187,10 @@ impl Value {
             };
         }
 
-        (Err(TError::of_unexpected(node, position)), position)
+        (
+            Err(TError::of_unexpected(node, input.source.len())),
+            input.source.len(),
+        )
     }
 
     fn extract_bulk_string(input: Input) -> InnerResult {
@@ -159,13 +203,16 @@ impl Value {
                 let start = 1 + size.to_string().len() + 2;
                 let end = start + size as usize;
 
-                return if "\r\n" == &input.source[end..end + 2] {
+                return if input.source[end..input.source.len()].starts_with("\r\n") {
                     (
                         Ok(Value::String(input.source[start..end].to_string())),
                         end + 2,
                     )
-                } else {
+                } else if end < input.source.len() {
                     let position = input.position + end;
+                    (Err(TError::of_size(BULK_STRING, position)), position)
+                } else {
+                    let position = input.position + end + 1;
                     (Err(TError::of_size(BULK_STRING, position)), position)
                 };
             }
@@ -201,7 +248,7 @@ impl Value {
 
 #[cfg(test)]
 mod tests {
-    use crate::Node::{ARRAY, BULK_STRING, SIMPLE_STRING, SIZE};
+    use crate::Node::{ARRAY, BULK_STRING, INTEGER, SIMPLE_STRING, SIZE};
 
     use super::super::{Error, Value};
 
@@ -269,13 +316,17 @@ mod tests {
         assert_eq!(":10\r\n".try_into(), Ok(Value::Integer(10i64)));
     }
 
-    // #[test]
-    // fn value_implement_try_from_resp_integer_with_invalid_integer() {
-    //     assert_eq!(
-    //         ":Yikes\r\n".try_into() as Result<Value, String>,
-    //         Err(UNEXPECTED_INPUT.into())
-    //     );
-    // }
+    #[test]
+    fn value_implement_try_from_resp_integer_with_invalid_integer() {
+        assert_eq!(
+            ":Yikes\r\n".try_into() as Result<Value, Error>,
+            Err(Error::of_type(INTEGER, 1))
+        );
+        assert_eq!(
+            ":0".try_into() as Result<Value, Error>,
+            Err(Error::of_unexpected(INTEGER, 2))
+        );
+    }
 
     #[test]
     fn value_implement_try_from_resp_bulk_string() {
@@ -291,6 +342,10 @@ mod tests {
 
     #[test]
     fn value_implement_try_from_resp_bulk_string_with_mismatching_len() {
+        assert_eq!(
+            "$5\r\nOops\r\n".try_into() as Result<Value, Error>,
+            Err(Error::of_size(BULK_STRING, 9))
+        );
         assert_eq!(
             "$3\r\nOops\r\n".try_into() as Result<Value, Error>,
             Err(Error::of_size(BULK_STRING, 7))

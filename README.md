@@ -28,29 +28,78 @@ squall_dot_io_resp = "0.1.2"
 
 Here are example with code:
 ```rust
-use crate::squall_dot_io_resp::{Error, Value};
+use squall_dot_io_resp::{
+    Node::{self, NIL, SIZE, ARRAY, ERROR, INTEGER, UNKNOWN, SIMPLE_STRING, BULK_STRING},
+    Value::{self, Nil, Error, Array, String, Integer},
+    Error as VError,
+    ValueResult,
+};
 
+assert_eq!( // Empty RESP
+    "".try_into() as ValueResult,
+    Err(VError::Unexpected {node: UNKNOWN, index: 0}));
+
+assert_eq!( // Unterminated number: missing "\r\n"
+    ":0".try_into() as ValueResult,
+    Err(VError::Unexpected {node: INTEGER, index: 2}));
+
+assert_eq!( // Not enough elements in the array
+    "*2\r\n$-1\r\n".try_into() as ValueResult,
+    Err(VError::Size {node: ARRAY, index: 9}));
+
+assert_eq!( // Longer bulk string: got more that 2-bytes
+    "$2\r\nHello\r\n".try_into() as ValueResult,
+    Err(VError::Size {node: BULK_STRING, index: 6}));
+
+assert_eq!( // Sorter bulk string: shorter by 1-byte (capital A acute is 2-bytes)
+    "$3\r\nÂ\r\n".try_into() as ValueResult,
+    Err(VError::Size {node: BULK_STRING, index: 7}));
+```
+
+```rust
+use squall_dot_io_resp::{
+    Node::{self, NIL, SIZE, ARRAY, ERROR, INTEGER, UNKNOWN, SIMPLE_STRING, BULK_STRING},
+    Value::{self, Nil, Error, Array, String, Integer},
+    Error as VError,
+    ValueResult,
+};
 // JSON: null
-with_resp("$-1\r\n".try_into());
+assert_eq!(
+    Value::try_from("$-1\r\n"),
+    Ok(Nil)
+);
 
 // JSON: 10
-with_resp(":10\r\n".try_into());
+assert_eq!(
+    Value::try_from(":10\r\n"),
+    Ok(Integer(10))
+);
 
 // JSON: "Nina Simone"
-with_resp("+Nina Simone\r\n".try_into());
+assert_eq!(
+    Value::try_from("+Nina Simone\r\n"),
+    Ok(String("Nina Simone".into()))
+);
 
 // JSON: "Lorem ipsum...\r\nDolor sit amet..."
-with_resp("$33\r\nLorem ipsum...\r\nDolor sit amet...\r\n".try_into());
+assert_eq!(
+    Value::try_from("$33\r\nLorem ipsum...\r\nDolor sit amet...\r\n"),
+    Ok(String("Lorem ipsum...\r\nDolor sit amet...".into()))
+);
 
 // JavaScript: [null, 447, new Error("Oh oh!"), "Hourly", "Si vis pacem,\r\npara bellum"]
-with_resp("*5\r\n$-1\r\n:447\r\n-Oh oh!\r\n+Hourly\r\n$26\r\nSi vis pacem,\r\npara bellum\r\n"
-          .try_into());
+assert_eq!(
+    Value::try_from("*5\r\n$-1\r\n:447\r\n-Oh oh!\r\n+Hourly\r\n$26\r\nSi vis pacem,\r\npara bellum\r\n"),
+    Ok(Array(vec![
+        Nil,
+        Integer(447),
+        Error("Oh oh!".into()),
+        String("Hourly".into()),
+        String("Si vis pacem,\r\npara bellum".into())
+    ]))
+);
 
 // NOTE: Even recursive arrays - we leave that for you to try out.
-
-fn with_resp(input: Result<Value, Error>) {
-    println!("{:?}", input);
-}
 ```
 
 ## License
