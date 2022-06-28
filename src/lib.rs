@@ -1,6 +1,7 @@
-//! # Squall.IO RESP (REdis Serialization Protocol) parser and validator.
+//! # RESP parser and validator.
 //!
-//! A RESP parser implementation, written with edge performance in mind.
+//! A RESP (REdis Serialization Protocol) parser implementation,
+//! written with edge performance in mind.
 //!
 //! If you are not familiar with RESP, consider starting here with
 //! RESP specs[^resp_spec_link]. RESP is a binary safe serialization
@@ -8,14 +9,26 @@
 //! safe (needs no escaping) and is fast forward as it requires no
 //! look-back in parsing.
 //!
-//! Should you find some issues, please report on GitHub project,
-//! or consider opening a pull-request.
+//! This crate aims to parse and validate your RESP strings. Since the
+//! protocol can be used beyond its initial scope, to a general-purpose
+//! communication scheme.
+//!
+//! To do so, its reuses Rust `TryInto` trait to try and parse your `&str`
+//! as a valid RESP. Implemented on a `Value` enum of RESP tokens, it
+//! returns a Rust `Result<Value, String>`.
+//!
+//! Whilst the error is a simple string for now, it will evolve into its own
+//! enum, which will be more descriptive of the reason behind the validation
+//! error(s) encountered.
+//!
+//! Should you find some issues[^issues_link], please report on GitHub
+//! project, or consider opening a pull-request[^pull_request_link].
+//!
+//! [^issues_link]: <https://github.com/SalathielGenese/resp/issues/>
 //!
 //! [^resp_spec_link]: <https://redis.io/docs/reference/protocol-spec/>
 //!
-//!
-//!
-//!
+//! [^pull_request_link]: <https://github.com/SalathielGenese/resp/compare/>
 
 pub mod value;
 
